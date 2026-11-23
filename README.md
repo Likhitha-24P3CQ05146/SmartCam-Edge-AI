@@ -1,55 +1,72 @@
 # SmartCam Edge AI — v1.4
 
-A local-first React + FastAPI prototype with recorded-video quality checks, optional pretrained general-object recognition, review workflow, SQLite history, CSV exports, and real-time in-app notifications via Server-Sent Events (SSE).
+A local-first React + FastAPI prototype for recorded-video analysis, optional AI object detection, motion anomaly screening, review workflow, SQLite history, CSV exports, and real-time notifications.
 
-## Quick start
+## Quick Start
 
-**Backend** (Python 3.11+):
+### 1. Backend (Python 3.11+)
 
-```bash
-cd backend
+Open PowerShell in the project folder:
+
+```powershell
 python -m venv .venv
-# Windows CMD: .venv\Scripts\activate.bat
-# macOS/Linux: source .venv/bin/activate
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python -m uvicorn main:app --reload
 ```
 
-**Frontend** (Node.js LTS):
+Backend runs at: `http://127.0.0.1:8000`
 
-```bash
-cd frontend
+### 2. Frontend (Node.js LTS)
+
+Open a second terminal in the same project folder:
+
+```powershell
 npm install
 npm run dev
 ```
 
-Open http://127.0.0.1:5173. Use an MP4, MOV, AVI, or WebM recording up to 100 MB.
+Open: `http://127.0.0.1:5173`
 
-## Optional AI object detection
+Upload an MP4, MOV, AVI, or WebM recording (up to 100 MB).
 
-Quality analysis and notifications work **without** installing AI dependencies. To enable pretrained detection:
+## Optional AI Object Detection
 
-1. Install `pip install -r requirements-ai.txt` in the backend virtual environment.
-2. Obtain the official `yolo11n.pt` weights from Ultralytics, subject to their licensing and model usage terms. Save the file at `backend/models/yolo11n.pt` (create the `models` directory). The project **does not automatically download weights**.
-3. Restart the backend. The dashboard will show **AI model ready**.
+Basic video quality analysis and notifications work without optional AI dependencies.
 
-Object labels/counts are aggregated over up to 24 sampled frames, **not unique objects**. The system does not recognize identities or track people. Processing speed depends on CPU performance.
+To enable pretrained object detection:
 
-## Real-time notifications
+1. Install AI dependencies:
 
-When analysis completes or review status changes, the backend stores an event in SQLite. The React dashboard listens to `/api/notifications/stream` using SSE and shows in-app alerts. The browser must remain open; there are no push notifications or emails.
+   ```powershell
+   pip install -r requirements-ai.txt
+   ```
 
-## New in v1.4: potential abnormal activity (motion screening)
+2. Obtain the official `yolo11n.pt` weights from Ultralytics, subject to its licensing and model usage terms.
+3. Create a `models` folder in the project directory and place `yolo11n.pt` inside it.
+4. Restart the backend.
 
-Every uploaded video is screened for **unusual changes in motion** relative to its own sampled-frame baseline. The result contains `anomaly_events` with approximate timestamps and `anomaly_score`, and the dashboard displays moments requiring human review. An SSE notification is generated when such a moment is detected. The feature runs without the optional YOLO model.
+Object labels and counts are aggregated over sampled frames, not unique objects. The system does not recognize identities or track people.
 
-**Important:** This is an explainable, baseline-based **motion anomaly heuristic**, not a trained action-recognition model. It cannot tell whether someone is falling, fighting, trespassing, or committing a crime. Scene changes, camera movement, compression artifacts, or ordinary busy activity may cause false positives; subtle events may be missed. It only analyzes sampled frames (up to 120), not every frame. Use consented test footage, and do not rely on it for safety-critical decisions.
+## Real-Time Notifications
+
+The backend stores notification events in SQLite. The React dashboard listens to `/api/notifications/stream` using Server-Sent Events (SSE) and displays in-app alerts.
+
+The browser must remain open for these in-app notifications.
+
+## Potential Abnormal Activity (Motion Screening)
+
+The system screens uploaded videos for unusual changes in motion relative to the sampled-frame baseline.
+
+It provides approximate timestamps and anomaly scores for moments requiring human review.
+
+**Important:** This is a motion anomaly heuristic, not a trained action-recognition model. It cannot identify falling, fighting, trespassing, or crime. False positives and missed events are possible. Do not use it for safety-critical decisions.
 
 ## Main APIs
 
 - `GET /api/health`
 - `GET /api/model-status`
-- `POST /api/analyze` (multipart `video`)
+- `POST /api/analyze`
 - `GET /api/analyses`
 - `POST /api/analyses/{id}/review`
 - `GET /api/summary`
@@ -57,19 +74,29 @@ Every uploaded video is screened for **unusual changes in motion** relative to i
 - `GET /api/notifications/stream`
 - `GET /api/report.csv`
 
-## Limitations
+## Mobile Browser Push Notifications (Web Push)
 
-This is a prototype for authorized, prerecorded video. No live camera feeds, identity recognition, person tracking, security-grade threat detection, login, or browser push notifications. Uploaded video files are temporary and deleted after analysis; only metadata and event records remain. Quality checks and detections can be inaccurate. The local API is unauthenticated and must not be exposed to the internet.
+The project includes optional browser Web Push support. It is not SMS or a native mobile application.
 
-## New in v1.4 — mobile browser push notifications (Web Push)
-
-**This is real browser Web Push, not SMS or a native Android/iOS app.** The backend uses VAPID and pywebpush. Push notifications can arrive after the dashboard tab closes **if** the phone browser supports push, the site is installed as required, notifications are allowed, and the backend remains online. Push delivery is best effort.
+Push delivery depends on browser support, HTTPS, notification permissions, device subscription, and the backend remaining online.
 
 ### Setup (Windows PowerShell)
 
-1. Install backend dependencies: `cd backend` then `python -m pip install -r requirements.txt`.
-2. Generate VAPID keys: `python generate_push_keys.py`. Save the printed PEM private key in `backend/vapid_private.pem` **without committing it to Git**. Copy the printed public key.
-3. Set environment variables in the **same terminal** where you run uvicorn:
+1. Install backend dependencies:
+
+   ```powershell
+   python -m pip install -r requirements.txt
+   ```
+
+2. Generate VAPID keys:
+
+   ```powershell
+   python generate_push_keys.py
+   ```
+
+3. Keep the private key in a local file such as `vapid_private.pem`. Never commit it to Git.
+
+4. Set the environment variables in the same terminal used to start the backend:
 
    ```powershell
    $env:SMARTCAM_VAPID_PRIVATE_KEY = (Resolve-Path .\vapid_private.pem).Path
@@ -79,18 +106,34 @@ This is a prototype for authorized, prerecorded video. No live camera feeds, ide
    python -m uvicorn main:app --reload
    ```
 
-   Replace the sample email with a real contact address, and generate a strong random enrollment token. Do not commit these values. The backend reads these settings at startup.
-4. Run the frontend with `cd frontend`, `npm install`, `npm run dev`. Visit on your computer at `http://localhost:5173` to test registration. localhost is a secure-context exception; phones are not.
-5. **For a real phone**, deploy frontend and backend behind the **same HTTPS origin** (reverse proxy `/api` to FastAPI). The backend must remain running and reachable; localhost on your laptop is not reachable from a phone outside that laptop. The current app has no user authentication, so **do not expose this prototype publicly** without adding authentication, access control, rate limits and secure deployment first. A private HTTPS deployment with appropriate access restrictions is recommended for testing.
-6. On Android Chrome, open the HTTPS site, enter enrollment token, tap **Enable on this device**, allow notifications. On iPhone/iPad, use Safari → Share → **Add to Home Screen**, open the installed app, then enable notifications there (supported iOS/iPadOS versions only).
-7. Analyze a video that produces a warning. The backend attempts a push to subscribed devices. It sends a short text alert only, not footage. The existing in-app SSE notifications still work.
+   Replace the sample values with your own values. Do not commit secrets.
 
-### Notes and limitations
+5. Start the frontend in a second terminal:
 
-- **No scheduled processing:** an uploaded video must be analyzed before an alert can be generated. No live CCTV support yet.
-- **Not a semantic activity detector:** motion anomalies can be false positives; this does not recognize crime, intent, or a particular human action.
-- **Only warnings trigger mobile push**; ordinary successful analyses and review updates remain in-app.
-- Push subscriptions are stored in SQLite. Invalid (404/410) subscriptions are cleaned up.
-- The enrollment token limits who can subscribe but **is not a replacement for full user authentication**. Do not reuse it as a public password.
-- The VAPID private key must remain secret. Changing keys invalidates existing subscriptions.
-- To disable on a device, enter the token and click **Disable**. Revoke an exposed token by rotating it and restarting the backend.
+   ```powershell
+   npm install
+   npm run dev
+   ```
+
+6. For phone testing, deploy the frontend and backend behind the same HTTPS origin. Configure the `/api` path to reach FastAPI.
+
+7. On supported Android browsers, open the HTTPS website, enter the enrollment token, enable notifications, and allow browser notification permission. On supported iOS/iPadOS versions, use Safari's Add to Home Screen option before enabling notifications.
+
+Push notifications are best effort. Only warning events trigger mobile push.
+
+## Limitations
+
+- Supports authorized, prerecorded video only.
+- No live CCTV feed support.
+- No identity recognition or person tracking.
+- No security-grade threat detection.
+- Motion anomaly results can contain false positives or miss events.
+- Uploaded videos are temporary; metadata and event records are stored.
+- The local API does not include user authentication. Do not expose it publicly without proper authentication, access controls, rate limits, and secure deployment.
+
+## Security Notes
+
+- Never upload private VAPID keys, passwords, enrollment tokens, or `.env` files.
+- Use consented test footage.
+- Keep private credentials outside the public repository.
+- Do not expose the unauthenticated prototype directly to the internet.
